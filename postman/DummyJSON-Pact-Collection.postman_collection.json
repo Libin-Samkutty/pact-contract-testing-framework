@@ -1,0 +1,555 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "name": "DummyJSON API (Pact-Tested Endpoints)",
+    "description": "Manual test collection covering all endpoints verified by the Pact contract tests in this repo.\n\n**Prerequisites:**\n- No server setup required — hits the public https://dummyjson.com API directly.\n\n**Getting started:**\n1. Run `Auth > Login - Valid Credentials` first.\n2. The test script auto-saves `accessToken` and `refreshToken` to collection variables.\n3. All authenticated requests will use those tokens automatically.\n\n**Test credentials:** emilys / emilyspass",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://dummyjson.com",
+      "type": "string",
+      "description": "Base URL for the DummyJSON API"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string",
+      "description": "JWT access token — auto-populated by the Login request"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string",
+      "description": "Refresh token — auto-populated by the Login request"
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "description": "Authentication endpoints: login, get current user, refresh token.",
+      "item": [
+        {
+          "name": "Login - Valid Credentials",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Auto-save tokens to collection variables after successful login",
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('accessToken', body.accessToken);",
+                  "    pm.collectionVariables.set('refreshToken', body.refreshToken);",
+                  "    pm.test('Login succeeded and tokens saved', () => {",
+                  "        pm.expect(body.accessToken).to.be.a('string').and.not.empty;",
+                  "        pm.expect(body.refreshToken).to.be.a('string').and.not.empty;",
+                  "    });",
+                  "    pm.test('Response contains user data', () => {",
+                  "        pm.expect(body.username).to.eql('emilys');",
+                  "        pm.expect(body.email).to.be.a('string');",
+                  "        pm.expect(body.id).to.be.a('number');",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"emilys\",\n  \"password\": \"emilyspass\",\n  \"expiresInMins\": 60\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Authenticate with valid credentials. The test script automatically saves `accessToken` and `refreshToken` to collection variables.\n\nExpected: 200 with user profile + tokens."
+          },
+          "response": []
+        },
+        {
+          "name": "Login - Invalid Credentials",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Returns 400 for invalid credentials', () => {",
+                  "    pm.expect(pm.response.code).to.eql(400);",
+                  "});",
+                  "pm.test('Error message present', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.message).to.be.a('string').and.not.empty;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"invalid_user\",\n  \"password\": \"wrong_password\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Attempt login with wrong credentials.\n\nExpected: 400 with `{ message: 'Invalid credentials' }`."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Authenticated User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Returns 200 with user profile', () => {",
+                  "    pm.expect(pm.response.code).to.eql(200);",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.id).to.be.a('number');",
+                  "    pm.expect(body.username).to.be.a('string').and.not.empty;",
+                  "    pm.expect(body.email).to.be.a('string').and.not.empty;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "description": "Auto-populated after running Login - Valid Credentials"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "me"]
+            },
+            "description": "Fetch the currently authenticated user's profile using the Bearer token.\n\nRun `Login - Valid Credentials` first to populate `{{accessToken}}`.\n\nExpected: 200 with user profile (id, username, email, firstName, lastName, gender, image)."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Authenticated User - Invalid Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Returns 401 for invalid auth token', () => {",
+                  "    pm.expect(pm.response.code).to.eql(401);",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.message).to.be.a('string').and.not.empty;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer this-is-not-a-valid-token",
+                "description": "Deliberately invalid token to trigger a 401 response"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "me"]
+            },
+            "description": "Call /auth/me with a deliberately invalid Bearer token.\n\nNote: DummyJSON returns 200 when the Authorization header is absent entirely, but returns 401 when an invalid token is provided.\n\nExpected: 401 with `{ message: 'Invalid/Expired Token!' }`."
+          },
+          "response": []
+        },
+        {
+          "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Returns 200 with new tokens', () => {",
+                  "    pm.expect(pm.response.code).to.eql(200);",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.accessToken).to.be.a('string').and.not.empty;",
+                  "    pm.expect(body.refreshToken).to.be.a('string').and.not.empty;",
+                  "});",
+                  "// Update stored tokens",
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('accessToken', body.accessToken);",
+                  "    pm.collectionVariables.set('refreshToken', body.refreshToken);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\",\n  \"expiresInMins\": 60\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "refresh"]
+            },
+            "description": "Exchange a refresh token for a new access token.\n\nRun `Login - Valid Credentials` first to populate `{{refreshToken}}`.\n\nExpected: 200 with new `accessToken` and `refreshToken`. The test script updates the stored tokens automatically."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Products",
+      "description": "Product endpoints: list, paginate, get by ID, create.",
+      "item": [
+        {
+          "name": "Get All Products",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Returns 200 with product list', () => {",
+                  "    pm.expect(pm.response.code).to.eql(200);",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.products).to.be.an('array').and.not.empty;",
+                  "    pm.expect(body.total).to.be.a('number');",
+                  "    pm.expect(body.skip).to.be.a('number');",
+                  "    pm.expect(body.limit).to.be.a('number');",
+                  "});",
+                  "pm.test('Each product has required fields', () => {",
+                  "    const body = pm.response.json();",
+                  "    const product = body.products[0];",
+                  "    pm.expect(product.id).to.be.a('number');",
+                  "    pm.expect(product.title).to.be.a('string');",
+                  "    pm.expect(product.price).to.be.a('number');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products",
+              "host": ["{{baseUrl}}"],
+              "path": ["products"]
+            },
+            "description": "Get the full list of products (default limit: 30).\n\nExpected: 200 with `{ products[], total, skip, limit }`."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Products - Paginated",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Returns 200 with paginated results', () => {",
+                  "    pm.expect(pm.response.code).to.eql(200);",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.products).to.be.an('array');",
+                  "    pm.expect(body.limit).to.eql(10);",
+                  "    pm.expect(body.skip).to.eql(10);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products?limit=10&skip=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["products"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Number of products to return"
+                },
+                {
+                  "key": "skip",
+                  "value": "10",
+                  "description": "Number of products to skip (offset)"
+                }
+              ]
+            },
+            "description": "Get a paginated subset of products (page 2, 10 per page).\n\nExpected: 200 with `skip: 10` and `limit: 10` in the response."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Product by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Returns 200 with product details', () => {",
+                  "    pm.expect(pm.response.code).to.eql(200);",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.id).to.eql(1);",
+                  "    pm.expect(body.title).to.be.a('string').and.not.empty;",
+                  "    pm.expect(body.price).to.be.a('number');",
+                  "    pm.expect(body.category).to.be.a('string');",
+                  "    pm.expect(body.images).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", "1"]
+            },
+            "description": "Get a single product by ID.\n\nExpected: 200 with full product details (id, title, price, description, category, brand, rating, stock, images, etc.)."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Product - Not Found",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Returns 404 for non-existent product', () => {",
+                  "    pm.expect(pm.response.code).to.eql(404);",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.message).to.be.a('string').and.not.empty;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/99999",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", "99999"]
+            },
+            "description": "Request a product with an ID that does not exist.\n\nExpected: 404 with `{ message: \"Product with id '99999' not found\" }`."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Product",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Returns 201 with created product', () => {",
+                  "    pm.expect(pm.response.code).to.eql(201);",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.id).to.be.a('number');",
+                  "    pm.expect(body.title).to.eql('Test Product');",
+                  "    pm.expect(body.price).to.eql(99.99);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Test Product\",\n  \"description\": \"A product created for contract testing\",\n  \"price\": 99.99,\n  \"stock\": 50,\n  \"category\": \"electronics\",\n  \"brand\": \"TestBrand\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/products/add",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", "add"]
+            },
+            "description": "Create a new product. Note: DummyJSON simulates the creation but does not persist data.\n\nExpected: 201 with the new product object including a server-assigned `id`."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "description": "User endpoints: list and get by ID (covered by Pact error contract tests).",
+      "item": [
+        {
+          "name": "Get All Users",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Returns 200 with user list', () => {",
+                  "    pm.expect(pm.response.code).to.eql(200);",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.users).to.be.an('array').and.not.empty;",
+                  "    pm.expect(body.total).to.be.a('number');",
+                  "});",
+                  "pm.test('Each user has required fields', () => {",
+                  "    const body = pm.response.json();",
+                  "    const user = body.users[0];",
+                  "    pm.expect(user.id).to.be.a('number');",
+                  "    pm.expect(user.username).to.be.a('string');",
+                  "    pm.expect(user.email).to.be.a('string');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["users"]
+            },
+            "description": "Get the full list of users (default limit: 30).\n\nExpected: 200 with `{ users[], total, skip, limit }`."
+          },
+          "response": []
+        },
+        {
+          "name": "Get User by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Returns 200 with user details', () => {",
+                  "    pm.expect(pm.response.code).to.eql(200);",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.id).to.eql(1);",
+                  "    pm.expect(body.username).to.be.a('string').and.not.empty;",
+                  "    pm.expect(body.email).to.be.a('string').and.not.empty;",
+                  "    pm.expect(body.firstName).to.be.a('string');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "1"]
+            },
+            "description": "Get a single user by ID.\n\nExpected: 200 with full user profile."
+          },
+          "response": []
+        },
+        {
+          "name": "Get User - Not Found",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Returns 404 for non-existent user', () => {",
+                  "    pm.expect(pm.response.code).to.eql(404);",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.message).to.be.a('string').and.not.empty;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/99999",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "99999"]
+            },
+            "description": "Request a user with an ID that does not exist.\n\nExpected: 404 with `{ message: \"User with id '99999' not found\" }`."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
