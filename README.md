@@ -12,15 +12,16 @@ A production-grade **consumer-driven contract testing** framework using [Pact](h
 4. [Quick Start](#quick-start)
 5. [Project Structure](#project-structure)
 6. [Running Tests](#running-tests)
-7. [Test Coverage](#test-coverage)
-8. [Writing New Contract Tests](#writing-new-contract-tests)
-9. [Pact Matchers Reference](#pact-matchers-reference)
-10. [Configuration](#configuration)
-11. [Docker Setup (Optional)](#docker-setup-optional)
-12. [CI/CD Workflow](#cicd-workflow)
-13. [Pact Broker](#pact-broker)
-14. [Troubleshooting](#troubleshooting)
-15. [Further Reading](#further-reading)
+7. [Postman Collection](#postman-collection)
+8. [Test Coverage](#test-coverage)
+9. [Writing New Contract Tests](#writing-new-contract-tests)
+10. [Pact Matchers Reference](#pact-matchers-reference)
+11. [Configuration](#configuration)
+12. [Docker Setup (Optional)](#docker-setup-optional)
+13. [CI/CD Workflow](#cicd-workflow)
+14. [Pact Broker](#pact-broker)
+15. [Troubleshooting](#troubleshooting)
+16. [Further Reading](#further-reading)
 
 ---
 
@@ -164,6 +165,10 @@ pact-contract-testing-framework/
 │   ├── verify-provider.sh                # Run provider verification
 │   └── can-i-deploy.sh                   # Check if safe to deploy
 │
+├── postman/
+│   ├── DummyJSON-Pact-Collection.postman_collection.json  # Postman collection (13 requests)
+│   └── reports/                          # Newman HTML reports (generated, git-ignored)
+│
 ├── .env.example                          # Environment variable reference
 ├── package.json                          # Root workspace config + scripts
 └── CLAUDE.md                             # AI assistant instructions for this repo
@@ -215,6 +220,56 @@ Coverage thresholds enforced: **80%** for branches, functions, lines, and statem
 Generated automatically after each run:
 - `consumer/reports/test-report.html`
 - `provider/reports/test-report.html`
+
+---
+
+## Postman Collection
+
+The collection at [postman/DummyJSON-Pact-Collection.postman_collection.json](postman/DummyJSON-Pact-Collection.postman_collection.json) covers the same 13 endpoints validated by the Pact tests and lets you explore them manually — or run them headlessly via Newman in CI.
+
+### Requests included
+
+| Folder | Request | Method | Endpoint |
+|--------|---------|--------|----------|
+| Auth | Login - Valid Credentials | POST | `/auth/login` |
+| Auth | Login - Invalid Credentials | POST | `/auth/login` |
+| Auth | Get Authenticated User | GET | `/auth/me` |
+| Auth | Get Authenticated User - Invalid Token | GET | `/auth/me` |
+| Auth | Refresh Token | POST | `/auth/refresh` |
+| Products | Get All Products | GET | `/products` |
+| Products | Get Products - Paginated | GET | `/products?limit=10&skip=10` |
+| Products | Get Product by ID | GET | `/products/1` |
+| Products | Get Product - Not Found | GET | `/products/99999` |
+| Products | Create Product | POST | `/products/add` |
+| Users | Get All Users | GET | `/users` |
+| Users | Get User by ID | GET | `/users/1` |
+| Users | Get User - Not Found | GET | `/users/99999` |
+
+All requests hit the public `https://dummyjson.com` API — no local server required.
+
+### Using in Postman (GUI)
+
+**Prerequisites:** [Postman desktop app](https://www.postman.com/downloads/) (free) — no account needed for local use.
+
+1. Open Postman → **Import** → select `postman/DummyJSON-Pact-Collection.postman_collection.json`
+2. Run **Auth → Login - Valid Credentials** first — the test script automatically saves `accessToken` and `refreshToken` as collection variables
+3. All other requests are ready to run in any order
+
+### Running via Newman (terminal)
+
+**Prerequisites:** Newman is installed as a dev dependency — just run `npm install` from the root.
+
+```bash
+# Run all 13 requests with CLI output
+npm run test:api
+
+# Run with an HTML report saved to postman/reports/report.html
+npm run test:api:html
+```
+
+Newman runs requests in collection order, so `Login - Valid Credentials` fires first and the access token is available to all authenticated requests automatically.
+
+> **Note on real API vs Pact mock behaviour:** The Pact consumer tests use a mock server that is configured to return `401` when no `Authorization` header is present. The real DummyJSON API returns `200` in that case. The Postman collection accounts for this — the "invalid token" request sends `Bearer this-is-not-a-valid-token` explicitly, which the real API correctly rejects with `401`.
 
 ---
 
@@ -671,5 +726,7 @@ npm install
 | `jest-html-reporters` | `^3.1.7` | HTML test reports |
 | `node-fetch` | `^2.7.0` | HTTP client for API calls |
 | `typescript` | `^5.3.0` | TypeScript compiler |
+| `newman` | `^6.1.3` | CLI runner for Postman collections |
+| `newman-reporter-htmlextra` | `^1.23.1` | HTML report generator for Newman runs |
 
 **Runtime requirements:** Node.js >= 18, npm >= 9
