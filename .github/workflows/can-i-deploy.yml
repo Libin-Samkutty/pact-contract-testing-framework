@@ -1,0 +1,98 @@
+# .github/workflows/can-i-deploy.yml
+
+# =============================================================================
+# CAN-I-DEPLOY CHECK
+# =============================================================================
+# Standalone workflow to check if a version can be safely deployed.
+# Use this as a deployment gate in your CD pipeline.
+#
+# This can be triggered manually or called from other workflows.
+# =============================================================================
+
+name: Can I Deploy Check
+
+on:
+  workflow_dispatch:
+    inputs:
+      pacticipant:
+        description: 'Application name (FrontendApp or DummyJSON)'
+        required: true
+        default: 'FrontendApp'
+        type: choice
+        options:
+          - FrontendApp
+          - DummyJSON
+      version:
+        description: 'Version to check (leave empty for latest)'
+        required: false
+        default: ''
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+          - development
+  workflow_call:
+    inputs:
+      pacticipant:
+        required: true
+        type: string
+      version:
+        required: false
+        type: string
+      environment:
+        required: true
+        type: string
+    outputs:
+      can-deploy:
+        description: 'Whether deployment is safe'
+        value: ${{ jobs.check.outputs.can-deploy }}
+
+env:
+  PACT_BROKER_BASE_URL: ${{ secrets.PACT_BROKER_URL || 'http://localhost:9292' }}
+
+jobs:
+  check:
+    name: Check Deployment Safety
+    runs-on: ubuntu-latest
+    outputs:
+      can-deploy: ${{ steps.check.outputs.can-deploy }}
+
+    steps:
+      - name: Setup Pact CLI
+        run: |
+          curl -LO https://github.com/pact-foundation/pact-ruby-standalone/releases/download/v2.4.2/pact-2.4.2-linux-x86_64.tar.gz
+          tar -xzf pact-2.4.2-linux-x86_64.tar.gz
+          echo "${PWD}/pact/bin" >> $GITHUB_PATH
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${{ github.sha }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run can-i-deploy check
+        id: check
+        run: |
+          if pact-broker can-i-deploy \
+            --pacticipant "${{ inputs.pacticipant }}" \
+            --version "${{ steps.version.outputs.version }}" \
+            --to-environment "${{ inputs.environment }}" \
+            --broker-base-url "${{ env.PACT_BROKER_BASE_URL }}" \
+            --output json > result.json 2>&1; then
+            echo "can-deploy=true" >> $GITHUB_OUTPUT
+            echo "✅ Safe to deploy ${{ inputs.pacticipant }}@${{ steps.version.outputs.version }} to ${{ inputs.environment }}"
+          else
+            echo "can-deploy=false" >> $GITHUB_OUTPUT
+            echo "❌ Cannot deploy - contracts not verified"
+            cat result.json
+            exit 1
+          fi
+        env:
+          PACT_BROKER_TOKEN: ${{ secrets.PACT_BROKER_TOKEN }}

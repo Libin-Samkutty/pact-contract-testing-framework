@@ -1,0 +1,136 @@
+# .github/workflows/provider.yml
+
+# =============================================================================
+# PROVIDER VERIFICATION PIPELINE
+# =============================================================================
+# This workflow verifies that the provider (DummyJSON) satisfies all consumer
+# contracts. It should run:
+# - When provider code changes
+# - When new contracts are published (via webhook)
+# - On a schedule to catch drift
+#
+# Workflow:
+# 1. Start the provider (DummyJSON via Docker)
+# 2. Fetch contracts from Pact Broker
+# 3. Verify each interaction
+# 4. Publish verification results
+# =============================================================================
+
+name: Provider Verification
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'provider/**'
+      - '.github/workflows/provider.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'provider/**'
+      - '.github/workflows/provider.yml'
+  # Webhook trigger from Pact Broker (configure in broker)
+  repository_dispatch:
+    types: [pact-changed]
+  # Schedule verification daily
+  # schedule:
+  #   - cron: '0 6 * * *'  # 6 AM UTC daily
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '18'
+  PACT_BROKER_BASE_URL: ${{ secrets.PACT_BROKER_URL || 'http://localhost:9292' }}
+  PACT_BROKER_TOKEN: ${{ secrets.PACT_BROKER_TOKEN }}
+  PROVIDER_BASE_URL: 'http://localhost:3000'
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Provider Verification
+  # ---------------------------------------------------------------------------
+  verify-provider:
+    name: Verify Provider Contracts
+    runs-on: ubuntu-latest
+
+    services:
+      # Start DummyJSON as a service container
+      dummyjson:
+        image: ovi2406/dummyjson:latest
+        ports:
+          - 3000:3000
+        options: >-
+          --health-cmd "curl -f http://localhost:3000/products/1 || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Wait for DummyJSON to be ready
+        run: |
+          echo "Waiting for DummyJSON to be ready..."
+          for i in {1..30}; do
+            if curl -s http://localhost:3000/products/1 > /dev/null; then
+              echo "DummyJSON is ready!"
+              break
+            fi
+            echo "Attempt $i: DummyJSON not ready yet..."
+            sleep 2
+          done
+          curl -s http://localhost:3000/products/1 | head -c 200
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download pact files (for local verification)
+        uses: actions/download-artifact@v4
+        with:
+          name: pact-contracts
+          path: pacts
+        continue-on-error: true  # May not exist if running independently
+
+      - name: Run provider verification (local files)
+        if: ${{ hashFiles('pacts/*.json') != '' }}
+        run: npm run test:pact
+        working-directory: provider
+        env:
+          PROVIDER_BASE_URL: ${{ env.PROVIDER_BASE_URL }}
+          PACT_LOG_LEVEL: info
+
+      - name: Run provider verification (from Broker)
+        run: npm run test:pact
+        working-directory: provider
+        env:
+          PROVIDER_BASE_URL: ${{ env.PROVIDER_BASE_URL }}
+          PACT_BROKER_URL: ${{ env.PACT_BROKER_BASE_URL }}
+          PACT_PROVIDER_VERSION: ${{ github.sha }}
+          GIT_BRANCH: ${{ github.ref_name }}
+          PACT_PUBLISH_VERIFICATION_RESULTS: 'true'
+        continue-on-error: true  # Don't fail if broker isn't available
+
+      - name: Record deployment
+        if: github.ref == 'refs/heads/main'
+        run: |
+          curl -LO https://github.com/pact-foundation/pact-ruby-standalone/releases/download/v2.4.2/pact-2.4.2-linux-x86_64.tar.gz
+          tar -xzf pact-2.4.2-linux-x86_64.tar.gz
+          ./pact/bin/pact-broker record-deployment \
+            --pacticipant DummyJSON \
+            --version ${{ github.sha }} \
+            --environment production \
+            --broker-base-url ${{ env.PACT_BROKER_BASE_URL }}
+        env:
+          PACT_BROKER_TOKEN: ${{ env.PACT_BROKER_TOKEN }}
+        continue-on-error: true

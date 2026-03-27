@@ -1,0 +1,57 @@
+{
+  "name": "pact-contract-testing-framework",
+  "version": "1.0.0",
+  "description": "Production-grade Pact-based contract testing framework with DummyJSON provider",
+  "private": true,
+  "workspaces": [
+    "consumer",
+    "provider"
+  ],
+  "scripts": {
+    "install:all": "npm install && npm install --workspaces",
+    "clean": "npm run clean --workspaces --if-present && rm -rf node_modules",
+    "clean:pacts": "rm -rf pacts/*.json",
+
+    "test": "npm run test --workspaces --if-present",
+    "test:consumer": "npm run test -w consumer",
+    "test:provider": "npm run test -w provider",
+
+    "pact:consumer": "npm run test:pact -w consumer",
+    "pact:provider": "npm run test:pact -w provider",
+    "pact:all": "npm run pact:consumer && npm run pact:provider",
+
+    "pact:publish": "./scripts/publish-pacts.sh",
+    "pact:can-i-deploy": "./scripts/can-i-deploy.sh",
+    "pact:verify": "./scripts/verify-provider.sh",
+
+    "docker:up": "docker-compose -f docker/docker-compose.yml up -d",
+    "docker:down": "docker-compose -f docker/docker-compose.yml down",
+    "docker:logs": "docker-compose -f docker/docker-compose.yml logs -f",
+    "docker:clean": "docker-compose -f docker/docker-compose.yml down -v --remove-orphans",
+
+    "setup": "./scripts/setup.sh",
+    "demo": "npm run docker:up && sleep 5 && npm run pact:consumer && npm run pact:publish && npm run pact:provider",
+
+    "lint": "eslint . --ext .ts,.tsx",
+    "format": "prettier --write \"**/*.{ts,tsx,json,md}\""
+  },
+  "keywords": [
+    "pact",
+    "contract-testing",
+    "consumer-driven",
+    "api-testing",
+    "microservices",
+    "dummyjson"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "prettier": "^3.1.0",
+    "typescript": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}

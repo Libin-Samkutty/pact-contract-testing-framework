@@ -1,0 +1,40 @@
+{
+  "name": "consumer",
+  "version": "1.0.0",
+  "description": "Consumer application with Pact contract tests for DummyJSON API",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "build:strict": "tsc --project tsconfig.strict.json",
+    "build:relaxed": "tsc --project tsconfig.relaxed.json",
+    "clean": "rm -rf dist coverage",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:pact": "jest --testMatch='**/*.pact.spec.ts' --runInBand",
+    "test:pact:verbose": "jest --testMatch='**/*.pact.spec.ts' --runInBand --verbose",
+    "test:unit": "jest --testMatch='**/*.unit.spec.ts'",
+    "typecheck": "tsc --noEmit",
+    "typecheck:strict": "tsc --noEmit --project tsconfig.strict.json"
+  },
+  "dependencies": {
+    "node-fetch": "^2.7.0"
+  },
+  "devDependencies": {
+    "@pact-foundation/pact": "^12.1.0",
+    "@types/jest": "^29.5.11",
+    "@types/node": "^20.10.0",
+    "@types/node-fetch": "^2.6.9",
+    "jest": "^29.7.0",
+    "jest-html-reporters": "^3.1.7",
+    "ts-jest": "^29.1.1",
+    "typescript": "^5.3.0"
+  },
+  "pact": {
+    "consumer": "FrontendApp",
+    "provider": "DummyJSON",
+    "pactDir": "../pacts",
+    "logLevel": "info"
+  }
+}

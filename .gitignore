@@ -1,0 +1,64 @@
+# .gitignore
+
+# Dependencies
+
+node_modules/
+.npm
+.pnpm-store/
+
+# Build outputs
+
+dist/
+build/
+*.tsbuildinfo
+
+# Pact generated files (optional - you may want to commit these)
+# pacts/*.json
+
+# Reports and Logs
+
+reports/
+*.html
+logs/
+*.log
+npm-debug.log*
+pact-*.log
+
+# Environment
+
+.env
+.env.local
+.env.*.local
+
+# IDE
+
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+
+.DS_Store
+Thumbs.db
+
+# Test coverage
+
+coverage/
+.nyc_output/
+
+# Docker volumes (local development)
+
+docker/data/
+docker/postgres-data/
+
+# Pact Broker SQLite database
+
+*.sqlite3
+
+# Temporary files
+
+tmp/
+temp/
+*.tmp
